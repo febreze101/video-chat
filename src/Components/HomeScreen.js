@@ -8,7 +8,7 @@ export default function HomeScreen() {
 
   return (
     <form method="post" action="">
-      <label for="username">Username</label>
+      <label htmlFor="username">Username</label>
 
       <input
         value={username}
@@ -16,7 +16,7 @@ export default function HomeScreen() {
         onInput={(e) => setUsername(e.target.value)}
       />
 
-      <label for="room">Room</label>
+      <label htmlFor="room">Room</label>
 
       <input
         value={room}

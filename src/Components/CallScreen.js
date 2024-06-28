@@ -3,6 +3,8 @@ import { useRef, useEffect } from "react";
 import socketio from "socket.io-client";
 import "./CallScreen.css";
 
+// TODO: Add custom STUN servers
+
 export default function CallScreen() {
   const params = useParams();
   const localUsername = params.username;
@@ -69,9 +71,12 @@ export default function CallScreen() {
       peerConn = new RTCPeerConnection({}); // create RTCPeerConnection obj
       peerConn.onicecandidate = onIceCandidate; // handle OnInceCandidate event and send to server
       peerConn.ontrack = onTrack; // handle onTrack event and set remote vid
+
       const localStream = localVideoRef.current.srcObject;
-      for (const track of localStream.getTracks()) {
-        peerConn.addTrack(track, localStream); // add our track to the peerConn for the remote user
+      if (localStream) {
+        for (const track of localStream.getTracks()) {
+          peerConn.addTrack(track, localStream); // add our track to the peerConn for the remote user
+        }
       }
       console.log("PeerConnection created");
     } catch (error) {
@@ -123,6 +128,7 @@ export default function CallScreen() {
   socket.on("ready", () => {
     console.log("Ready to Connect!");
     CreatePeerConnection();
+    sendOffer();
   });
 
   // on a data signal, pass it to signal handler

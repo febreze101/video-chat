@@ -5,6 +5,8 @@ app = Flask(__name__)
 app.secret_key = 'c02912516684db8d91c8c236'
 socketio = SocketIO(app=app, cors_allowed_origins="*")
 
+# TODO: Add SSL certs
+# TODO: Add more socket events (i.e. disconnect, etc...)
 
 # event handler for the 'join' event
 # get their username and room info. Join the room

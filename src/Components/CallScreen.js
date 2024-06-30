@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import socketio from "socket.io-client";
 import "./CallScreen.css";
 
@@ -11,25 +11,26 @@ export default function CallScreen() {
   const roomName = params.room;
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const peerConn = useRef(null);
 
   // socketio connection to our local signaling server
-  const socket = socketio("http://localhost:9000", {
+  const socket = socketio("https://localhost:9000", {
     autoConnect: false,
   });
 
-  // RTCPeerConnection Object
-  let peerConn;
-
   // fn to send data to server
-  const sendData = (data) => {
-    socket.emit("data", {
-      username: localUsername,
-      room: roomName,
-      data: data,
-    });
-  };
+  const sendData = useCallback(
+    (data) => {
+      socket.emit("data", {
+        username: localUsername,
+        room: roomName,
+        data: data,
+      });
+    },
+    [localUsername, roomName, socket]
+  );
 
-  const startConnection = () => {
+  const startConnection = useCallback(() => {
     // get our media devices
     navigator.mediaDevices
       .getUserMedia({
@@ -48,101 +49,123 @@ export default function CallScreen() {
       .catch((error) => {
         console.error("Stream not found: ", error);
       });
-  };
+  }, [localUsername, roomName, socket]);
 
-  const onIceCandidate = (event) => {
-    if (event.candidate) {
-      console.log(event.candidate);
-      console.log("Sending ICE candidate");
-      sendData({
-        type: "candidate",
-        candidate: event.candidate,
-      });
-    }
-  };
+  const onIceCandidate = useCallback(
+    (event) => {
+      if (event.candidate) {
+        // console.log(event.candidate);
+        console.log("Sending ICE candidate");
+        sendData({
+          type: "candidate",
+          candidate: event.candidate,
+        });
+      }
+    },
+    [sendData]
+  );
 
-  const onTrack = (event) => {
+  const onTrack = useCallback((event) => {
     console.log("Adding remote track");
     remoteVideoRef.current.srcObject = event.streams[0];
-  };
+  }, []);
 
-  const CreatePeerConnection = () => {
+  const createPeerConnection = useCallback(() => {
     try {
-      peerConn = new RTCPeerConnection({}); // create RTCPeerConnection obj
-      peerConn.onicecandidate = onIceCandidate; // handle OnInceCandidate event and send to server
-      peerConn.ontrack = onTrack; // handle onTrack event and set remote vid
+      const newPeerConn = new RTCPeerConnection({}); // create RTCPeerConnection obj
+      newPeerConn.onicecandidate = onIceCandidate; // handle OnInceCandidate event and send to server
+      newPeerConn.ontrack = onTrack; // handle onTrack event and set remote vid
 
       const localStream = localVideoRef.current.srcObject;
       if (localStream) {
         for (const track of localStream.getTracks()) {
-          peerConn.addTrack(track, localStream); // add our track to the peerConn for the remote user
+          newPeerConn.addTrack(track, localStream); // add our track to the peerConn for the remote user
         }
       }
+      peerConn.current = newPeerConn;
       console.log("PeerConnection created");
     } catch (error) {
       console.error("PeerConnection failed: ", error);
     }
-  };
+  }, [onIceCandidate, onTrack]);
 
   // set our local SDP and send it to the server to be broadcasted
-  const setAndSendLocalDescription = (sessionDescription) => {
-    peerConn.setLocalDescription(sessionDescription);
-    console.log("Local SDP set");
-    sendData(sessionDescription);
-  };
+  const setAndSendLocalDescription = useCallback(
+    (sessionDescription) => {
+      peerConn.current.setLocalDescription(sessionDescription);
+      console.log("Local SDP set");
+      sendData(sessionDescription);
+    },
+    [sendData]
+  );
 
   // create our SDP offer
-  const sendOffer = () => {
+  const sendOffer = useCallback(() => {
     console.log("Sending offer");
-    peerConn.createOffer().then(setAndSendLocalDescription, (error) => {
-      console.error("Send answer failed: ", error);
+    peerConn.current.createOffer().then(setAndSendLocalDescription, (error) => {
+      console.error("Send offer failed: ", error);
     });
-  };
+  }, [setAndSendLocalDescription]);
 
   // send our answer (remote SDP) to an offer
-  const sendAnswer = () => {
+  const sendAnswer = useCallback(() => {
     console.log("Sending answer");
-    peerConn.createAnswer().then(setAndSendLocalDescription, (error) => {
-      console.error("Send answer failed: ", error);
-    });
-  };
+    peerConn.current
+      .createAnswer()
+      .then(setAndSendLocalDescription, (error) => {
+        console.error("Send answer failed: ", error);
+      });
+  }, [setAndSendLocalDescription]);
 
-  const signalingDataHandler = (data) => {
-    // if we get an offer, create a peer connection and set remote SDP and send answer
-    if (data.type === "offer") {
-      CreatePeerConnection();
-      peerConn.setRemoteDescription(new RTCSessionDescription(data));
-      sendAnswer();
-    } else if (data.type === "answer") {
-      // if an answer, set remote SDP
-      peerConn.setRemoteDescription(new RTCSessionDescription(data));
-    } else if (data.type === "candidate") {
-      // if data is an ICE candidate, add it to our list of candidates
-      peerConn.addIceCandidate(new RTCIceCandidate(data.candidate));
-    } else {
-      console.log("Unknown Data");
-    }
-  };
-
-  // on ready start a peer connection
-  socket.on("ready", () => {
-    console.log("Ready to Connect!");
-    CreatePeerConnection();
-    sendOffer();
-  });
-
-  // on a data signal, pass it to signal handler
-  socket.on("data", (data) => {
-    console.log("Data received: ", data);
-    signalingDataHandler(data);
-  });
+  const signalingDataHandler = useCallback(
+    (data) => {
+      // if we get an offer, create a peer connection and set remote SDP and send answer
+      if (data.type === "offer") {
+        createPeerConnection();
+        peerConn.current.setRemoteDescription(new RTCSessionDescription(data));
+        sendAnswer();
+      } else if (data.type === "answer") {
+        // if an answer, set remote SDP
+        peerConn.current.setRemoteDescription(new RTCSessionDescription(data));
+      } else if (data.type === "candidate") {
+        // if data is an ICE candidate, add it to our list of candidates
+        peerConn.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+      } else {
+        console.log("Unknown Data");
+      }
+    },
+    [createPeerConnection, sendAnswer]
+  );
 
   useEffect(() => {
     startConnection();
+
+    // on ready start a peer connection
+    socket.on("ready", () => {
+      console.log("Ready to Connect!");
+      createPeerConnection();
+      sendOffer();
+    });
+
+    // on a data signal, pass it to signal handler
+    socket.on("data", (data) => {
+      console.log("Data received: ", data);
+      signalingDataHandler(data);
+    });
+
     return function cleanup() {
-      peerConn?.close();
+      if (peerConn.current) {
+        peerConn.current.close();
+        console.log("PeerConnection closed");
+      }
     };
-  }, []);
+  }, [
+    startConnection,
+    createPeerConnection,
+    sendOffer,
+    signalingDataHandler,
+    socket,
+  ]);
 
   return (
     <>

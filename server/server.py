@@ -35,4 +35,28 @@ def default_error_handler(e):
     socketio.stop()
 
 if __name__ == '__main__':
+    
+    # Define SSL certificate and key file paths 
+    CERT_FILE = "cert.pem" 
+    KEY_FILE = "key.pem" 
+
+
+    # Define SSL context
+    # ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # ssl_context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
+
+    # # Wrap the listening socket with SSL
+    # ssl_socket = eventlet.wrap_ssl(
+    #     eventlet.listen(('0.0.0.0', 9000)),
+    #     certfile=CERT_FILE,
+    #     keyfile=KEY_FILE,
+    #     server_side=True
+    # )
+    # eventlet.wsgi.server(ssl_socket, app)
+
+    # socketio.run(app, host="0.0.0.0", port=9000, ssl_context=ssl_context)
+    #     server_side=True,
+    # )
+    # eventlet.wsgi.server(ssl_socket, app)
+
     socketio.run(app, host="0.0.0.0", port=9000)

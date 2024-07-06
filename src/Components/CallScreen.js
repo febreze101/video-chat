@@ -1,6 +1,5 @@
 import { useParams } from "react-router-dom";
 import { useRef, useEffect, useCallback } from "react";
-import { useRef, useEffect, useCallback } from "react";
 import socketio from "socket.io-client";
 import "./CallScreen.css";
 
@@ -13,24 +12,13 @@ export default function CallScreen() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerConn = useRef(null);
-  const peerConn = useRef(null);
 
   // socketio connection to our local signaling server
-  const socket = socketio("https://localhost:9000", {
+  const socket = socketio("http://localhost:9000", {
     autoConnect: false,
   });
 
   // fn to send data to server
-  const sendData = useCallback(
-    (data) => {
-      socket.emit("data", {
-        username: localUsername,
-        room: roomName,
-        data: data,
-      });
-    },
-    [localUsername, roomName, socket]
-  );
   const sendData = useCallback(
     (data) => {
       socket.emit("data", {
@@ -62,7 +50,6 @@ export default function CallScreen() {
         console.error("Stream not found: ", error);
       });
   }, [localUsername, roomName, socket]);
-  }, [localUsername, roomName, socket]);
 
   const onIceCandidate = useCallback(
     (event) => {
@@ -77,33 +64,14 @@ export default function CallScreen() {
     },
     [sendData]
   );
-  const onIceCandidate = useCallback(
-    (event) => {
-      if (event.candidate) {
-        // console.log(event.candidate);
-        console.log("Sending ICE candidate");
-        sendData({
-          type: "candidate",
-          candidate: event.candidate,
-        });
-      }
-    },
-    [sendData]
-  );
 
-  const onTrack = useCallback((event) => {
   const onTrack = useCallback((event) => {
     console.log("Adding remote track");
     remoteVideoRef.current.srcObject = event.streams[0];
   }, []);
-  }, []);
 
   const createPeerConnection = useCallback(() => {
-  const createPeerConnection = useCallback(() => {
     try {
-      const newPeerConn = new RTCPeerConnection({}); // create RTCPeerConnection obj
-      newPeerConn.onicecandidate = onIceCandidate; // handle OnInceCandidate event and send to server
-      newPeerConn.ontrack = onTrack; // handle onTrack event and set remote vid
       const newPeerConn = new RTCPeerConnection({}); // create RTCPeerConnection obj
       newPeerConn.onicecandidate = onIceCandidate; // handle OnInceCandidate event and send to server
       newPeerConn.ontrack = onTrack; // handle onTrack event and set remote vid
@@ -112,10 +80,8 @@ export default function CallScreen() {
       if (localStream) {
         for (const track of localStream.getTracks()) {
           newPeerConn.addTrack(track, localStream); // add our track to the peerConn for the remote user
-          newPeerConn.addTrack(track, localStream); // add our track to the peerConn for the remote user
         }
       }
-      peerConn.current = newPeerConn;
       peerConn.current = newPeerConn;
       console.log("PeerConnection created");
     } catch (error) {
@@ -125,16 +91,13 @@ export default function CallScreen() {
 
   // set our local SDP and send it to the server to be broadcasted
   const setAndSendLocalDescription = useCallback(
-    useCallback(
     (sessionDescription) => {
-        peerConn.current.current.setLocalDescription(sessionDescription);
+      peerConn.current.setLocalDescription(sessionDescription);
       console.log("SDP", sessionDescription);
-        console.log("Local SDP set");
+      console.log("Local SDP set");
       console.log(peerConn.current);
-        sendData(sessionDescription);
-      },
-    [sendData]
-  ),
+      sendData(sessionDescription);
+    },
     [sendData]
   );
 
